@@ -1,41 +1,29 @@
-# Corpse Run
+# SWARM
 
-> A roguelite where you can't win without dying — every time you die, your body
-> stays and becomes part of the level.
+A juicy action horde-survival mini. Move around, auto-fire at the swarm, watch
+things explode, grab XP, level up, get stronger, see how long you last.
 
-## The hook
-The exit is too high to reach alive. Death isn't a punishment — it's your only
-tool. **Sacrifice** yourself and your corpse freezes in place as a solid
-platform. Build a staircase out of your own dead bodies and climb out before you
-run out of lives.
+## Why this one
+Built for **fun + learning**, not for an original "hook." The thing that makes
+arcade action feel good is **game feel / juice** — so this leans hard into:
+screen shake, particle bursts on every hit and kill, enemy hit-flash + knockback,
+XP orbs that magnet toward you, and a snappy level-up upgrade screen.
 
-## Why it can stand
-- **The hook *is* the gameplay** — no one frames death as the core resource.
-- **Clippable** — a tower built of your own corpses is a screenshot that
-  explains itself.
-- **Buildable solo** — pure 2D, no netcode, no voice chat, no horror-atmosphere
-  bar to clear.
-- **Roguelite chassis** — procedural pits + run-based replay = cheap content,
-  paying audience — but an original theme, so it's not a clone.
-
-## Play the prototype
+## Play it
 Open `index.html` in any browser. No install, no build step.
 
-| Action | Keys |
-|---|---|
-| Move | `A`/`D` or `←`/`→` |
-| Jump | `W` / `Space` / `↑` |
-| Sacrifice (die in place) | `S` |
-| Restart run | `R` |
+- **Move:** `WASD` or arrow keys
+- **Fire:** automatic — you shoot the nearest enemy
+- **Level up:** collect blue XP orbs, then pick 1 of 3 upgrades
+- Survive as long as you can. Big orange enemies are tanky and drop more XP.
 
-## What this MVP proves
-The single thing worth testing first: does a player look at the gap, realise
-they have to *die on purpose* to cross it, and go *"ohhh"*? If yes, the hook is
-real and everything after is content.
+## What you'd learn building this
+The core loop behind a whole genre (Vampire Survivors et al.): entity spawning,
+pooling, collision, an upgrade system, and — most importantly — how *juice*
+turns a boring loop into something that feels good.
 
-## Roadmap (after the hook lands)
-- Procedurally generated shafts + escalating hazards (spikes, crushers, gaps).
-- Corpse *types* — sacrifice mid-jump for a high platform, near a switch to hold
-  it, in front of a hazard as a shield.
-- Meta-progression between runs (the roguelite layer).
-- Port to Godot for the full build + mobile/web export.
+## Next steps if it's fun
+- Sound effects (huge for feel).
+- More enemy types + a boss every 60s.
+- More/weirder upgrades and weapon evolutions.
+- Mobile touch controls (virtual joystick).
