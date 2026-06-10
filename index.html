@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Corpse Run — prototype</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body {
+    margin: 0; height: 100%; background: #0b0b12; color: #d7d7e0;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 14px; user-select: none;
+  }
+  h1 { margin: 0; font-size: 18px; letter-spacing: 2px; color: #b9b9d6; font-weight: 600; }
+  #wrap { position: relative; }
+  canvas {
+    background: #07070d; border: 1px solid #23233a; border-radius: 6px;
+    box-shadow: 0 10px 40px rgba(0,0,0,.6);
+    display: block; image-rendering: pixelated;
+  }
+  #hud {
+    position: absolute; top: 10px; left: 12px; right: 12px;
+    display: flex; justify-content: space-between; pointer-events: none;
+    font-size: 13px; text-shadow: 0 1px 2px #000;
+  }
+  #hud .lives { color: #ff6b7a; }
+  #hud .corpses { color: #9fd6ff; }
+  #help {
+    font-size: 12px; color: #6f6f8a; max-width: 520px; text-align: center;
+    line-height: 1.6;
+  }
+  #help b { color: #b9b9d6; }
+  #overlay {
+    position: absolute; inset: 0; display: none; flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px;
+    background: rgba(7,7,13,.82); border-radius: 6px; text-align: center;
+  }
+  #overlay.show { display: flex; }
+  #overlay h2 { margin: 0; font-size: 26px; letter-spacing: 2px; }
+  #overlay p { margin: 0; color: #9a9ab4; font-size: 13px; }
+  #overlay .win { color: #8effc0; }
+  #overlay .lose { color: #ff6b7a; }
+  kbd {
+    background: #1a1a2c; border: 1px solid #33334d; border-radius: 4px;
+    padding: 1px 6px; font-size: 11px; color: #cfcfe6;
+  }
+</style>
+</head>
+<body>
+  <h1>C O R P S E &nbsp; R U N</h1>
+  <div id="wrap">
+    <canvas id="game" width="640" height="480"></canvas>
+    <div id="hud">
+      <span class="lives">LIVES: <span id="lives">6</span></span>
+      <span class="corpses">CORPSES: <span id="corpses">0</span></span>
+    </div>
+    <div id="overlay">
+      <h2 id="overlay-title"></h2>
+      <p id="overlay-msg"></p>
+      <p>Press <kbd>R</kbd> to restart the run</p>
+    </div>
+  </div>
+  <div id="help">
+    The exit is too high to reach alive. <b>Sacrifice yourself</b> to leave your
+    body behind — your corpses become solid platforms. Build a staircase of the
+    dead and climb out.<br/>
+    <kbd>A</kbd>/<kbd>D</kbd> or <kbd>←</kbd>/<kbd>→</kbd> move &nbsp;·&nbsp;
+    <kbd>W</kbd>/<kbd>Space</kbd>/<kbd>↑</kbd> jump &nbsp;·&nbsp;
+    <kbd>S</kbd> sacrifice &nbsp;·&nbsp; <kbd>R</kbd> restart run
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const cv = document.getElementById("game");
+  const ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  const TILE = 32;
+
+  const livesEl   = document.getElementById("lives");
+  const corpsesEl = document.getElementById("corpses");
+  const overlay   = document.getElementById("overlay");
+  const ovTitle   = document.getElementById("overlay-title");
+  const ovMsg     = document.getElementById("overlay-msg");
+
+  // ----- Level -----
+  // A tall vertical shaft. The exit ledge sits high on the right; the only way
+  // up is to stack your own corpses into steps. '#' solid, 'E' exit, 'S' spawn.
+  // Drawn top-to-bottom; world is taller than the viewport so the camera pans.
+  const MAP = [
+    "..........EE....",
+    "..........##....",
+    "................",
+    "................",
+    "................",
+    "...........#....",
+    "................",
+    "................",
+    "........#.......",
+    "................",
+    "................",
+    ".....#..........",
+    "................",
+    "................",
+    "..#.............",
+    "................",
+    "S...............",
+    "################",
+  ];
+  const COLS = MAP[0].length;
+  const ROWS = MAP.length;
+  const WORLD_H = ROWS * TILE;
+  const WORLD_W = COLS * TILE;
+
+  const solids = [];   // static level geometry {x,y,w,h}
+  let exit = null;     // {x,y,w,h}
+  let spawn = { x: 0, y: 0 };
+
+  function parseMap() {
+    solids.length = 0;
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const ch = MAP[r][c];
+        const x = c * TILE, y = r * TILE;
+        if (ch === "#") solids.push({ x, y, w: TILE, h: TILE });
+        else if (ch === "E") exit = exit
+          ? { x: Math.min(exit.x, x), y, w: exit.w + TILE, h: TILE }
+          : { x, y, w: TILE, h: TILE };
+        else if (ch === "S") spawn = { x: x + 4, y: y + 2 };
+      }
+    }
+  }
+  parseMap();
+
+  // ----- State -----
+  const START_LIVES = 6;
+  let lives, corpses, player, keys, gameState; // gameState: "play" | "win" | "lose"
+  let cam = 0;
+
+  function newRun() {
+    lives = START_LIVES;
+    corpses = [];               // {x,y,w,h} — placed bodies, become solid
+    gameState = "play";
+    overlay.classList.remove("show");
+    spawnPlayer();
+    updateHud();
+  }
+
+  function spawnPlayer() {
+    player = {
+      x: spawn.x, y: spawn.y, w: 22, h: 28,
+      vx: 0, vy: 0, onGround: false, dead: false,
+    };
+  }
+
+  function updateHud() {
+    livesEl.textContent = lives;
+    corpsesEl.textContent = corpses.length;
+  }
+
+  function allSolids() { return solids.concat(corpses); }
+
+  // ----- Input -----
+  keys = {};
+  const DOWN_ONCE = {};
+  addEventListener("keydown", (e) => {
+    const k = e.key.toLowerCase();
+    if ([" ", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(k)) e.preventDefault();
+    if (!keys[k]) DOWN_ONCE[k] = true;
+    keys[k] = true;
+
+    if (k === "r") newRun();
+    if (gameState === "play") {
+      if (k === "s") sacrifice();
+    }
+  });
+  addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
+
+  function pressed(...ks) { return ks.some((k) => keys[k]); }
+
+  // ----- Death / sacrifice -----
+  function sacrifice() {
+    if (player.dead) return;
+    die();
+  }
+
+  function die() {
+    if (player.dead) return;
+    player.dead = true;
+    // leave the body where it fell, snapped to a tidy block
+    corpses.push({ x: player.x, y: player.y, w: player.w, h: player.h, corpse: true });
+    lives -= 1;
+    updateHud();
+    if (lives <= 0) {
+      // last body still placed; check if it was enough next frame, else lose
+      setTimeout(() => {
+        if (gameState === "play") endRun(false);
+      }, 350);
+    }
+    setTimeout(() => {
+      if (gameState === "play" && lives > 0) spawnPlayer();
+    }, 280);
+  }
+
+  function endRun(won) {
+    gameState = won ? "win" : "lose";
+    ovTitle.textContent = won ? "ESCAPED" : "OUT OF BODIES";
+    ovTitle.className = won ? "win" : "lose";
+    ovMsg.textContent = won
+      ? `You climbed out on ${corpses.length} of your own corpses.`
+      : "Not enough of you left to reach the top.";
+    overlay.classList.add("show");
+  }
+
+  // ----- Physics -----
+  const GRAV = 0.7, MOVE = 2.6, JUMP = 11, MAXFALL = 14;
+
+  function rectsOverlap(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
+  function moveAxis(dx, dy) {
+    player.x += dx;
+    for (const s of allSolids()) {
+      if (rectsOverlap(player, s)) {
+        if (dx > 0) player.x = s.x - player.w;
+        else if (dx < 0) player.x = s.x + s.w;
+        player.vx = 0;
+      }
+    }
+    player.y += dy;
+    player.onGround = false;
+    for (const s of allSolids()) {
+      if (rectsOverlap(player, s)) {
+        if (dy > 0) { player.y = s.y - player.h; player.onGround = true; player.vy = 0; }
+        else if (dy < 0) { player.y = s.y + s.h; player.vy = 0; }
+      }
+    }
+  }
+
+  function update() {
+    if (gameState !== "play" || player.dead) return;
+
+    const left = pressed("a", "arrowleft");
+    const right = pressed("d", "arrowright");
+    player.vx = (right - left) * MOVE;
+
+    if (pressed("w", " ", "arrowup") && player.onGround) {
+      player.vy = -JUMP; player.onGround = false;
+    }
+
+    player.vy = Math.min(player.vy + GRAV, MAXFALL);
+
+    moveAxis(player.vx, 0);
+    moveAxis(0, player.vy);
+
+    // fell out of the world -> counts as a death (still leaves a body at edge)
+    if (player.y > WORLD_H + 80) {
+      player.y = WORLD_H; die();
+    }
+
+    // reached exit?
+    if (exit && rectsOverlap(player, exit)) endRun(true);
+
+    // camera follows player vertically, clamped
+    const target = player.y - H * 0.55;
+    cam += (target - cam) * 0.12;
+    cam = Math.max(0, Math.min(cam, WORLD_H - H));
+  }
+
+  // ----- Render -----
+  function drawRect(o, fill, stroke) {
+    ctx.fillStyle = fill;
+    ctx.fillRect(o.x, o.y - cam, o.w, o.h);
+    if (stroke) { ctx.strokeStyle = stroke; ctx.strokeRect(o.x + .5, o.y - cam + .5, o.w - 1, o.h - 1); }
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+
+    // subtle depth gradient
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "#0c0c18"); g.addColorStop(1, "#050509");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+    // level geometry
+    for (const s of solids) drawRect(s, "#1d1d2e", "#2b2b45");
+
+    // exit — glowing
+    if (exit) {
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 300);
+      ctx.save();
+      ctx.shadowColor = "#8effc0"; ctx.shadowBlur = 18 + pulse * 14;
+      drawRect(exit, "#1c5c3c");
+      ctx.restore();
+      ctx.fillStyle = "#8effc0";
+      ctx.font = "11px monospace"; ctx.textAlign = "center";
+      ctx.fillText("EXIT", exit.x + exit.w / 2, exit.y - cam - 6);
+    }
+
+    // corpses
+    for (const c of corpses) {
+      drawRect(c, "#3a3550", "#5a5378");
+      // little skull-ish mark
+      ctx.fillStyle = "#cfcadf";
+      ctx.fillRect(c.x + 6, c.y - cam + 8, 3, 3);
+      ctx.fillRect(c.x + c.w - 9, c.y - cam + 8, 3, 3);
+    }
+
+    // player
+    if (!player.dead) {
+      ctx.save();
+      ctx.shadowColor = "#ff6b7a"; ctx.shadowBlur = 10;
+      drawRect(player, "#e85d6a");
+      ctx.restore();
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(player.x + 5, player.y - cam + 8, 3, 3);
+      ctx.fillRect(player.x + player.w - 8, player.y - cam + 8, 3, 3);
+    }
+  }
+
+  function loop() {
+    update();
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  newRun();
+  loop();
+})();
+</script>
+</body>
+</html>
