@@ -281,24 +281,15 @@
         else if(s<15) iv=35;
         else if(s<20) iv=28;
         else iv=Math.max(6, 24 - (s-20)*0.15);  // 20s+: slowly increases
-        iv/=3.2;              // 3.2x faster spawns overall
-        // once big mobs appear (25s+), gradually thin the small mobs (up to ~35% slower),
-        // but never stop them — keeps the difficulty curve smooth.
-        if(s>25) iv*=1+Math.min((s-25)/60, 0.35);
-        return iv;
+        return iv/3.2;        // 3.2x faster spawns overall
       },
-      // big mobs get their own staged spawn cadence (like small mobs, but slower).
-      // start after 25s, then ramp the rate up. Infinity = none yet.
+      // big mobs start after 25s, then the rate steps up a little every 5 seconds.
+      // (uncapped — they keep coming) Infinity = none yet.
       bigSpawnInterval: (s)=>{
         if(s<25) return Infinity;
-        let iv;
-        if(s<45)  iv=230;
-        else if(s<80)  iv=160;
-        else if(s<120) iv=115;
-        else iv=Math.max(80, 115 - (s-120)*0.3);
-        return iv/3;          // 3x faster big-mob spawns
+        const steps=Math.floor((s-25)/5);        // one step every 5s after 25s
+        return Math.max(8, 30 - steps*1.2);      // faster each step
       },
-      bigCap:        6,                                       // max concurrent elite/big mobs
       miniGap:       [100,100],                               // seconds between minibosses (fixed 100)
       bossHp:        ()=> 15000,
     }, opts);
@@ -329,11 +320,8 @@
       spawnTimerBig-=dt;
       if(spawnTimerBig<=0){
         const bi=cfg.bigSpawnInterval(elapsed);
-        if(isFinite(bi)){
-          let bc=0; for(const e of enemies) if(e.big&&!e.mini&&!e.boss) bc++;
-          if(bc<(cfg.bigCap||6)) spawnEnemy(true);
-          spawnTimerBig=bi;
-        } else spawnTimerBig=30;   // recheck soon until big mobs unlock
+        if(isFinite(bi)){ spawnEnemy(true); spawnTimerBig=bi; }   // uncapped
+        else spawnTimerBig=30;   // recheck soon until big mobs unlock
       }
       // minibosses every random 50-80 REAL seconds, can stack
       if(time>=nextMini){ spawnMiniboss(); nextMini=time+rand(cfg.miniGap[0],cfg.miniGap[1])*60; }
