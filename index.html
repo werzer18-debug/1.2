@@ -183,8 +183,8 @@
   function spawnEnemy(big){
     const p=edgePos(20);
     const secs=time/60;
-    const hpScale=Math.min(secs*0.25, 45);   // gradual HP growth, capped (stays manageable)
-    const dmgScale=Math.min(secs*0.02, 8);   // very gradual damage growth, capped
+    const hpScale=Math.min(secs*0.12, 45);   // slow growth across full 6-min run
+    const dmgScale=Math.min(secs*0.012, 8); // very slow damage growth
     const hp=((big?81:20)+hpScale*(big?3:1))*1.5;
     enemies.push({
       x:p.x, y:p.y, r: big?20:11,
@@ -268,28 +268,29 @@
   const TOTAL_WAVES=3;
   function makeWave(opts){
     return Object.assign({
-      minDuration: 150,                                       // seconds before the boss arrives
+      minDuration: 330,                                       // boss at 5.5 min
       // roguelite ramp: a slow trickle for the first 2s, then steadily denser over the run.
       // (frames between spawns; 60 = 1s) lower = faster.
       // staged early ramp (steps at 3/5/10/15/20s), then a slow continuous climb.
       // (frames between spawns; 60 = 1s) lower = faster.
+      // stretched over 360s: slow warmup → gradual climb → peaks near end
       spawnInterval: (s)=>{
         let iv;
-        if(s<3)  iv=86;
-        else if(s<5)  iv=64;
-        else if(s<10) iv=51;
-        else if(s<15) iv=38;
-        else if(s<20) iv=30;
-        else iv=Math.max(8, 26 - (s-20)*0.15);
+        if(s<15)       iv=190;   // 0-15s:   ~1.0/s
+        else if(s<40)  iv=120;   // 15-40s:  ~1.6/s
+        else if(s<90)  iv=80;    // 40-90s:  ~2.4/s
+        else if(s<180) iv=55;    // 90-180s: ~3.5/s
+        else if(s<270) iv=38;    // 180-270s:~5.1/s
+        else iv=Math.max(22, 38-(s-270)*0.10); // 270s+: up to ~8.7/s
         return iv/3.2;
       },
-      // big mobs start after 25s, stepping up every 5s. ~1.5/s at 25s, ~5/s cap.
+      // big mobs join at 60s, step up every 15s, cap at 3/s around 5 min
       bigSpawnInterval: (s)=>{
-        if(s<25) return Infinity;
-        const steps=Math.floor((s-25)/5);
-        return Math.max(12, 40 - steps*1.6);
+        if(s<60) return Infinity;
+        const steps=Math.floor((s-60)/15);
+        return Math.max(20, 60 - steps*3.0);
       },
-      miniGap:       [100,100],                               // seconds between minibosses (fixed 100)
+      miniGap:       [120,120],                               // mini 1 at 2 min, mini 2 at 4 min
       bossHp:        ()=> 15000,
     }, opts);
   }
