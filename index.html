@@ -203,7 +203,7 @@
   function spawnMiniboss(){
     const p=edgePos(30);
     miniCount++;
-    const hp=Math.floor(progressive(12000, 1.2, miniCount-1));   // reusable scaling
+    const hp=Math.floor(progressive(10000, 1.2, miniCount-1));   // reusable scaling
     const dmg=Math.floor(progressive(14, 1.15, miniCount-1));
     enemies.push({ x:p.x, y:p.y, r:38, hp, maxhp:hp, speed:0.95, dmg,
                    big:true, mini:true, color:"#ff5ec4", hit:0,
@@ -269,14 +269,14 @@
       spawnInterval: (s)=> Math.max(60, 130 - s*0.4),         // frames between mob spawns (slow)
       bigChance:     (s)=> s<25 ? 0 : Math.min((s-25)/250, 0.35), // big mobs introduced gradually
       miniGap:       [100,100],                               // seconds between minibosses (fixed 100)
-      bossHp:        ()=> 22000,
+      bossHp:        ()=> 20000,
     }, opts);
   }
   const WAVES = {
     1: makeWave({}),                                          // Wave 1 — fully defined
     // Placeholders — fill in real content later WITHOUT touching Wave 1:
-    2: makeWave({ bossHp:()=>28000 }),
-    3: makeWave({ bossHp:()=>36000 }),
+    2: makeWave({ bossHp:()=>26000 }),
+    3: makeWave({ bossHp:()=>34000 }),
   };
 
   function startWave(){
@@ -529,7 +529,7 @@
     for(const o of orbs){
       const d=dist2(o.x,o.y,player.x,player.y);
       if(d<120*120){ const a=Math.atan2(player.y-o.y,player.x-o.x); const pull=Math.min(7,9000/(Math.sqrt(d)+1)); o.x+=Math.cos(a)*pull; o.y+=Math.sin(a)*pull; }
-      if(d<(player.r+8)*(player.r+8)){ o.dead=true; player.xp+=o.v; burst(o.x,o.y,"#5ad1ff",4,2); }
+      if(d<(player.r+8)*(player.r+8)){ o.dead=true; player.xp+=o.v*1.15; burst(o.x,o.y,"#5ad1ff",4,2); }
     }
     orbs=orbs.filter(o=>!o.dead);
 
