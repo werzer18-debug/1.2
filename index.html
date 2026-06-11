@@ -405,7 +405,7 @@
     player.orbPos=[];
     if(player.orbiters>0){
       player.orbA+=dt*0.12;
-      const radius=46, bladeR=10, bladeDmg=42*dt;
+      const radius=46, bladeR=10, bladeDmg=10*dt;
       for(let i=0;i<player.orbiters;i++){
         const a=player.orbA + i*(Math.PI*2/player.orbiters);
         const bx=player.x+Math.cos(a)*radius, by=player.y+Math.sin(a)*radius;
@@ -723,8 +723,10 @@
     let elapsed=ts-lastTs; lastTs=ts;
     if(elapsed>250) elapsed=250;       // clamp big gaps (tab switch) to avoid a catch-up burst
     acc+=elapsed;
+    // consume ALL accumulated real time each frame (cap covers the 250ms clamp ≈15 steps)
+    // so the sim keeps real-time pace even when the display refresh rate dips.
     let steps=0;
-    while(acc>=STEP && steps<5){ update(1); acc-=STEP; steps++; }  // dt=1 per fixed step
+    while(acc>=STEP && steps<16){ update(1); acc-=STEP; steps++; }  // dt=1 per fixed step
     render(); syncHud();
     requestAnimationFrame(loop);
   }
