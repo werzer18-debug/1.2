@@ -23,6 +23,7 @@
     display: flex; justify-content: space-between; pointer-events: none;
     font-size: 13px; text-shadow: 0 1px 3px #000;
   }
+  #hud .grp { display: flex; gap: 14px; }
   #lvlbar {
     position: absolute; left: 0; right: 0; top: 0; height: 4px;
     background: #14182a;
@@ -61,13 +62,11 @@
 <body>
   <h1>S W A R M</h1>
   <div id="wrap">
-    <canvas id="game" width="720" height="520"></canvas>
+    <canvas id="game" width="820" height="600"></canvas>
     <div id="lvlbar"><div id="lvlfill"></div></div>
     <div id="hud">
-      <span style="color:#8effc0">LVL <span id="lvl">1</span></span>
-      <span style="color:#ffd25a">TIME <span id="time">0</span>s</span>
-      <span style="color:#ff6b7a">HP <span id="hp">100</span></span>
-      <span style="color:#9fd6ff">KILLS <span id="kills">0</span></span>
+      <span class="grp"><span style="color:#8effc0">LVL <span id="lvl">1</span></span><span style="color:#ffd25a">TIME <span id="time">0</span>s</span></span>
+      <span class="grp"><span style="color:#ff6b7a">HP <span id="hp">100</span></span><span style="color:#9fd6ff">KILLS <span id="kills">0</span></span></span>
     </div>
     <div id="overlay">
       <h2 id="ov-title"></h2>
@@ -93,6 +92,7 @@
   const rand=(a,b)=>a+Math.random()*(b-a);
   const dist2=(ax,ay,bx,by)=>{const dx=ax-bx,dy=ay-by;return dx*dx+dy*dy;};
   const fmt=(s)=>{ s=Math.max(0,Math.ceil(s)); const m=Math.floor(s/60); return m>0?(m+":"+String(s%60).padStart(2,"0")):(s+"s"); };
+  const XP_MULT=1.265;                 // base XP gain bonus (+15% then +10%)
 
   // ---- audio (tiny WebAudio synth — no asset files) ----
   let actx=null;
@@ -180,8 +180,8 @@
   function spawnEnemy(big){
     const p=edgePos(20);
     const secs=time/60;
-    const hpScale=secs*0.35;            // mobs slowly gain HP over time
-    const dmgScale=secs*0.03;           // and very slowly gain damage
+    const hpScale=Math.min(secs*0.25, 45);   // gradual HP growth, capped (stays manageable)
+    const dmgScale=Math.min(secs*0.02, 8);   // very gradual damage growth, capped
     const hp=((big?81:20)+hpScale*(big?3:1))*1.5;
     enemies.push({
       x:p.x, y:p.y, r: big?20:11,
@@ -203,8 +203,8 @@
   function spawnMiniboss(){
     const p=edgePos(30);
     miniCount++;
-    const hp=Math.floor(progressive(10000, 1.2, miniCount-1));   // reusable scaling
-    const dmg=Math.floor(progressive(14, 1.15, miniCount-1));
+    const hp=Math.floor(progressive(7000, 1.1, miniCount-1));    // +10% per spawn
+    const dmg=Math.floor(progressive(14, 1.1, miniCount-1));     // +10% per spawn
     enemies.push({ x:p.x, y:p.y, r:38, hp, maxhp:hp, speed:0.95, dmg,
                    big:true, mini:true, color:"#ff5ec4", hit:0,
                    abCd:5, tele:0, teleMax:0, teleKind:null, charge:null });
@@ -266,17 +266,18 @@
   function makeWave(opts){
     return Object.assign({
       minDuration: 150,                                       // seconds before the boss arrives
-      spawnInterval: (s)=> Math.max(60, 130 - s*0.4),         // frames between mob spawns (slow)
-      bigChance:     (s)=> s<25 ? 0 : Math.min((s-25)/250, 0.35), // big mobs introduced gradually
+      spawnInterval: (s)=> Math.max(96, 180 - s*0.45),        // frames between spawns (significantly slower)
+      bigChance:     (s)=> s<30 ? 0 : Math.min((s-30)/320, 0.25), // big mobs: gentle intro, capped chance
+      bigCap:        6,                                       // max concurrent elite/big mobs
       miniGap:       [100,100],                               // seconds between minibosses (fixed 100)
-      bossHp:        ()=> 20000,
+      bossHp:        ()=> 15000,
     }, opts);
   }
   const WAVES = {
     1: makeWave({}),                                          // Wave 1 — fully defined
     // Placeholders — fill in real content later WITHOUT touching Wave 1:
-    2: makeWave({ bossHp:()=>26000 }),
-    3: makeWave({ bossHp:()=>34000 }),
+    2: makeWave({ bossHp:()=>19000 }),
+    3: makeWave({ bossHp:()=>24000 }),
   };
 
   function startWave(){
@@ -294,7 +295,11 @@
       // (spawnInterval is in frames: 60 = 1s, so tick by dt — NOT dt*60)
       spawnTimer-=dt;
       if(spawnTimer<=0){
-        spawnEnemy(Math.random()<cfg.bigChance(elapsed));
+        let big = Math.random()<cfg.bigChance(elapsed);
+        // cap concurrent big/elite mobs so they can't pile up without limit
+        if(big){ let bc=0; for(const e of enemies) if(e.big&&!e.mini&&!e.boss) bc++;
+          if(bc>=(cfg.bigCap||6)) big=false; }
+        spawnEnemy(big);
         spawnTimer=cfg.spawnInterval(elapsed);
       }
       // minibosses every random 50-80 REAL seconds, can stack
@@ -500,11 +505,12 @@
       if(e.boss){
         for(let i=0;i<14;i++) orbs.push({x:e.x+rand(-34,34),y:e.y+rand(-34,34),r:4,v:5});
         player.hp=Math.min(player.maxhp,player.hp+30);
-        drops.push({x:e.x,y:e.y,r:13});   // power token — grab it to choose an ability
+        drops.push({x:e.x,y:e.y,r:13,type:"power"});   // power token — choose an ability
         bannerText="BOSS DOWN"; bannerT=100; sfx.bossdown();
       } else if(e.mini){
         for(let i=0;i<8;i++) orbs.push({x:e.x+rand(-24,24),y:e.y+rand(-24,24),r:4,v:3});
         player.hp=Math.min(player.maxhp,player.hp+12);
+        drops.push({x:e.x,y:e.y,r:12,type:"magnet"});  // magnet — vacuums all XP gems
         bannerText="MINIBOSS DOWN"; bannerT=80; sfx.bossdown();
       } else {
         orbs.push({x:e.x,y:e.y,r:4,v:e.big?5:1});
@@ -529,15 +535,24 @@
     for(const o of orbs){
       const d=dist2(o.x,o.y,player.x,player.y);
       if(d<120*120){ const a=Math.atan2(player.y-o.y,player.x-o.x); const pull=Math.min(7,9000/(Math.sqrt(d)+1)); o.x+=Math.cos(a)*pull; o.y+=Math.sin(a)*pull; }
-      if(d<(player.r+8)*(player.r+8)){ o.dead=true; player.xp+=o.v*1.15; burst(o.x,o.y,"#5ad1ff",4,2); }
+      if(d<(player.r+8)*(player.r+8)){ o.dead=true; player.xp+=o.v*XP_MULT; burst(o.x,o.y,"#5ad1ff",4,2); }
     }
     orbs=orbs.filter(o=>!o.dead);
 
-    // boss power tokens — magnet in, then offer a choice of 3 abilities
+    // pickups (boss power token + miniboss magnet) — magnet toward player, then resolve
     for(const dp of drops){
       const d=dist2(dp.x,dp.y,player.x,player.y);
       if(d<150*150){ const a=Math.atan2(player.y-dp.y,player.x-dp.x); const pull=Math.min(6,8000/(Math.sqrt(d)+1)); dp.x+=Math.cos(a)*pull; dp.y+=Math.sin(a)*pull; }
-      if(d<(player.r+dp.r)*(player.r+dp.r)){ dp.dead=true; burst(dp.x,dp.y,"#ffd25a",24,5); addShake(5); showUpgradeChoice("BOSS REWARD","Choose a power","#ffd25a"); }
+      if(d<(player.r+dp.r)*(player.r+dp.r)){
+        dp.dead=true; addShake(5);
+        if(dp.type==="magnet"){                 // vacuum every XP gem on the map (once)
+          for(const o of orbs){ player.xp+=o.v*XP_MULT; }
+          burst(dp.x,dp.y,"#5ad1ff",30,6); orbs=[];
+          bannerText="MAGNET — XP COLLECTED"; bannerT=90; tone(680,0.18,"square",0.05,420);
+        } else {                                // power token
+          burst(dp.x,dp.y,"#ffd25a",24,5); showUpgradeChoice("BOSS REWARD","Choose a power","#ffd25a");
+        }
+      }
     }
     drops=drops.filter(dp=>!dp.dead);
 
@@ -567,11 +582,11 @@
       ctx.beginPath();ctx.arc(o.x,o.y,o.r,0,7);ctx.fill(); }
     ctx.shadowBlur=0;
 
-    // boss power tokens (pulsing golden diamond)
+    // pickups: gold diamond = boss power token, cyan diamond = miniboss magnet
     for(const dp of drops){
-      const s=dp.r+3*Math.sin(time*0.15);
+      const s=dp.r+3*Math.sin(time*0.15), magnet=dp.type==="magnet";
       ctx.save(); ctx.translate(dp.x,dp.y); ctx.rotate(time*0.04);
-      ctx.fillStyle="#ffe08a"; ctx.shadowColor="#ffae00"; ctx.shadowBlur=18;
+      ctx.fillStyle=magnet?"#7fe9ff":"#ffe08a"; ctx.shadowColor=magnet?"#39e0ff":"#ffae00"; ctx.shadowBlur=18;
       ctx.fillRect(-s/2,-s/2,s,s);
       ctx.restore();
     }
@@ -663,20 +678,16 @@
           ctx.fillStyle="#23233a"; ctx.fillRect(x,y0,segW,bh);
         }
       }
-      ctx.fillStyle="#9fb3d0"; ctx.font="9px monospace"; ctx.textAlign="center";
-      const label = wave>n ? "ALL CLEAR" : ("WAVE "+wave+"/"+n);
-      ctx.fillText(label, W/2, y0+bh+11);
-      // miniboss & boss spawn countdowns
+      // single combined info line beneath the bar (no overlap with corner HUD)
       const cfg=WAVES[wave];
+      let label = wave>n ? "ALL CLEAR" : ("WAVE "+wave+"/"+n);
       if(cfg && wavePhase==="fight"){
-        const toMini=(nextMini-time)/60, toBoss=cfg.minDuration-(time-waveStart)/60;
-        ctx.font="9px monospace";
-        ctx.fillStyle="#ff9ad6"; ctx.textAlign="right"; ctx.fillText("◣ MINI "+fmt(toMini), W/2-8, y0+bh+22);
-        ctx.fillStyle="#c9a0ff"; ctx.textAlign="left";  ctx.fillText("◆ BOSS "+fmt(toBoss), W/2+8, y0+bh+22);
+        label += "    ◣ MINI "+fmt((nextMini-time)/60)+"    ◆ BOSS "+fmt(cfg.minDuration-(time-waveStart)/60);
       } else if(wavePhase==="boss"){
-        ctx.fillStyle="#c9a0ff"; ctx.font="9px monospace"; ctx.textAlign="center";
-        ctx.fillText("◆ BOSS ACTIVE — defeat it to clear the wave", W/2, y0+bh+22);
+        label += "    ◆ BOSS ACTIVE";
       }
+      ctx.fillStyle="#9fb3d0"; ctx.font="10px monospace"; ctx.textAlign="center";
+      ctx.fillText(label, W/2, y0+bh+13);
     }
 
     // boss health bar
