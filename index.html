@@ -275,20 +275,19 @@
       // (frames between spawns; 60 = 1s) lower = faster.
       spawnInterval: (s)=>{
         let iv;
-        if(s<3)  iv=70;       // staged early ramp...
-        else if(s<5)  iv=55;
-        else if(s<10) iv=45;
-        else if(s<15) iv=35;
-        else if(s<20) iv=28;
-        else iv=Math.max(6, 24 - (s-20)*0.15);  // 20s+: slowly increases
-        return iv/3.2;        // 3.2x faster spawns overall
+        if(s<3)  iv=86;
+        else if(s<5)  iv=64;
+        else if(s<10) iv=51;
+        else if(s<15) iv=38;
+        else if(s<20) iv=30;
+        else iv=Math.max(8, 26 - (s-20)*0.15);
+        return iv/3.2;
       },
-      // big mobs start after 25s, then the rate steps up a little every 5 seconds.
-      // (uncapped — they keep coming) Infinity = none yet.
+      // big mobs start after 25s, stepping up every 5s. ~1.5/s at 25s, ~5/s cap.
       bigSpawnInterval: (s)=>{
         if(s<25) return Infinity;
-        const steps=Math.floor((s-25)/5);        // one step every 5s after 25s
-        return Math.max(8, 30 - steps*1.2);      // faster each step
+        const steps=Math.floor((s-25)/5);
+        return Math.max(12, 40 - steps*1.6);
       },
       miniGap:       [100,100],                               // seconds between minibosses (fixed 100)
       bossHp:        ()=> 15000,
