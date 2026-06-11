@@ -205,7 +205,7 @@
     miniCount++;
     const hp=Math.floor(progressive(1600, 1.35, miniCount-1));   // reusable scaling
     const dmg=Math.floor(progressive(24, 1.18, miniCount-1));
-    enemies.push({ x:p.x, y:p.y, r:28, hp, maxhp:hp, speed:0.95, dmg,
+    enemies.push({ x:p.x, y:p.y, r:38, hp, maxhp:hp, speed:0.95, dmg,
                    big:true, mini:true, color:"#ff5ec4", hit:0,
                    abCd:5, tele:0, teleMax:0, teleKind:null, charge:null });
     sfx.boss(); bannerText="MINIBOSS "+miniCount; bannerT=80; addShake(5);
@@ -255,8 +255,8 @@
       e.abCd=7;
     } else if(kind==="charge"){                // miniboss: lunge toward telegraphed point
       const tg=e.chargeAim||{x:player.x,y:player.y};
-      const a=Math.atan2(tg.y-e.y, tg.x-e.x), dashSpeed=9.5;
-      e.charge={vx:Math.cos(a)*dashSpeed, vy:Math.sin(a)*dashSpeed, t:20};
+      const a=Math.atan2(tg.y-e.y, tg.x-e.x), dashSpeed=4.5;
+      e.charge={vx:Math.cos(a)*dashSpeed, vy:Math.sin(a)*dashSpeed, t:16};
       addShake(4); e.abCd=6;
     }
   }
@@ -323,7 +323,7 @@
     {t:"Orbiting Blade", lvl:0, d:"A blade spins around you, shredding what it touches.", fn:p=>p.orbiters++},
     {t:"Explosive Rounds", lvl:0, d:"Kills detonate, damaging nearby enemies.", fn:p=>p.explosive++},
     {t:"Shock Nova", lvl:0, d:"Periodically blast a ring of energy around you.", fn:p=>p.nova++},
-    {t:"Life Leech", lvl:0, d:"Heal a little with every kill.", fn:p=>p.lifesteal++},
+    {t:"Life Leech", lvl:0, d:"Heal a tiny amount with every kill.", fn:p=>p.lifesteal++},
   ];
   // stars showing how many times an upgrade has already been taken
   function lvlTag(u){
@@ -514,8 +514,8 @@
         burst(e.x,e.y,"#ffb24a",18,6);
         for(const o of enemies){ if(o!==e && !o.dead && dist2(o.x,o.y,e.x,e.y)<R*R){ o.hp-=dmg; o.hit=6; } }
       }
-      // life leech: heal a little on each kill
-      if(player.lifesteal>0) player.hp=Math.min(player.maxhp, player.hp+player.lifesteal*2);
+      // life leech: heal a tiny amount on each kill
+      if(player.lifesteal>0) player.hp=Math.min(player.maxhp, player.hp+player.lifesteal*0.1);
     }
     for(const e of enemies){ if(!e.dead && e.hp<=0){ e.dead=true; killReward(e); } }
 
