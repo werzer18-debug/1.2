@@ -122,7 +122,7 @@
   };
 
   // ---- state ----
-  let player, enemies, bullets, orbs, particles, keys;
+  let player, enemies, bullets, orbs, particles, drops, keys;
   let time, kills, spawnTimer, paused, gameOver, shake, frame, lastTs;
   let nextBoss, bannerText, bannerT;
 
@@ -131,10 +131,10 @@
                level:1, xp:0, xpNext:18, invuln:0,
                fireRate:24, fireCd:0, dmg:12, bulletSpeed:8.5, bullets:1, pierce:0, range:1e9,
                orbiters:0, orbA:0, orbPos:[], explosive:0 };
-    enemies=[]; bullets=[]; orbs=[]; particles=[];
+    enemies=[]; bullets=[]; orbs=[]; particles=[]; drops=[];
     keys={}; time=0; kills=0; spawnTimer=0; paused=false; gameOver=false;
     shake=0; frame=0; lastTs=performance.now();
-    nextBoss=45*60; bannerText=""; bannerT=0;
+    nextBoss=200*60; bannerText=""; bannerT=0;
     UPGRADES.forEach(u=>u.lvl=0);   // reset upgrade stars each run
     overlay.classList.remove("show"); ovBtn.style.display="none";
   }
@@ -160,11 +160,15 @@
     let x,y;
     if(edge===0){x=rand(0,W);y=-20;} else if(edge===1){x=W+20;y=rand(0,H);}
     else if(edge===2){x=rand(0,W);y=H+20;} else {x=-20;y=rand(0,H);}
-    const tough=Math.min(time/30,4);
-    const big=Math.random()<Math.min(0.08+time/600,0.25);
+    const secs=time/60;
+    const hpScale=secs*0.35;            // mobs slowly gain HP over time
+    const dmgScale=secs*0.03;           // and very slowly gain damage
+    const big=Math.random()<Math.min(0.08+secs/300,0.25);
     enemies.push({
-      x,y, r: big?20:11, hp: (big?81:20)+tough*9, maxhp:0,
-      speed: big?0.8:rand(0.9,1.4), dmg: big?20:10, big,
+      x,y, r: big?20:11,
+      hp: (big?81:20) + hpScale*(big?3:1), maxhp:0,
+      speed: big?0.8:rand(0.9,1.4),
+      dmg: (big?20:10) + dmgScale*(big?1.5:1), big,
       color: big?"#ff7b3a":"#ff5d6a", hit:0
     });
     enemies[enemies.length-1].maxhp=enemies[enemies.length-1].hp;
@@ -202,13 +206,11 @@
     for(let i=0;i<3;i++) out.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
     return out;
   }
-  function levelUp(){
-    player.level++; player.xp-=player.xpNext; player.xpNext=Math.floor(player.xpNext*1.7+10);
-    player.hp=Math.min(player.maxhp,player.hp+8);
+  function showUpgradeChoice(title,sub,titleColor){
     paused=true;
     const choices=pick3();
-    ovTitle.textContent="LEVEL "+player.level; ovTitle.style.color="#8effc0";
-    ovSub.textContent="Choose an upgrade";
+    ovTitle.textContent=title; ovTitle.style.color=titleColor||"#8effc0";
+    ovSub.textContent=sub;
     ovCards.innerHTML=""; ovBtn.style.display="none";
     choices.forEach(u=>{
       const el=document.createElement("div"); el.className="card";
@@ -218,6 +220,11 @@
     });
     sfx.level();
     overlay.classList.add("show");
+  }
+  function levelUp(){
+    player.level++; player.xp-=player.xpNext; player.xpNext=Math.floor(player.xpNext*1.7+10);
+    player.hp=Math.min(player.maxhp,player.hp+8);
+    showUpgradeChoice("LEVEL "+player.level, "Choose an upgrade");
   }
 
   function die(){
@@ -246,8 +253,8 @@
     const interval=Math.max(96,220-time*0.6);
     if(spawnTimer<=0){ spawnEnemy(); spawnTimer=interval; }
 
-    // boss: first at 45s, then every 60s (time is in frames; 60 frames = 1s)
-    if(time>=nextBoss){ spawnBoss(); nextBoss+=60*60; }
+    // boss every 200s (time is in frames; 60 frames = 1s)
+    if(time>=nextBoss){ spawnBoss(); nextBoss+=200*60; }
     if(bannerT>0) bannerT-=dt*60;
 
     if(player.invuln>0) player.invuln-=dt*60;
@@ -334,6 +341,7 @@
       if(e.boss){
         for(let i=0;i<14;i++) orbs.push({x:e.x+rand(-34,34),y:e.y+rand(-34,34),r:4,v:5});
         player.hp=Math.min(player.maxhp,player.hp+30);
+        drops.push({x:e.x,y:e.y,r:13});   // power token — grab it to choose an ability
         bannerText="BOSS DOWN"; bannerT=100; sfx.bossdown();
       } else {
         orbs.push({x:e.x,y:e.y,r:4,v:e.big?5:1});
@@ -357,6 +365,15 @@
       if(d<(player.r+8)*(player.r+8)){ o.dead=true; player.xp+=o.v; burst(o.x,o.y,"#5ad1ff",4,2); }
     }
     orbs=orbs.filter(o=>!o.dead);
+
+    // boss power tokens — magnet in, then offer a choice of 3 abilities
+    for(const dp of drops){
+      const d=dist2(dp.x,dp.y,player.x,player.y);
+      if(d<150*150){ const a=Math.atan2(player.y-dp.y,player.x-dp.x); const pull=Math.min(6,8000/(Math.sqrt(d)+1)); dp.x+=Math.cos(a)*pull; dp.y+=Math.sin(a)*pull; }
+      if(d<(player.r+dp.r)*(player.r+dp.r)){ dp.dead=true; burst(dp.x,dp.y,"#ffd25a",24,5); addShake(5); showUpgradeChoice("BOSS REWARD","Choose a power","#ffd25a"); }
+    }
+    drops=drops.filter(dp=>!dp.dead);
+
     while(player.xp>=player.xpNext){ levelUp(); }
 
     // particles
@@ -381,6 +398,16 @@
     // orbs
     for(const o of orbs){ ctx.fillStyle="#5ad1ff"; ctx.shadowColor="#5ad1ff"; ctx.shadowBlur=8;
       ctx.beginPath();ctx.arc(o.x,o.y,o.r,0,7);ctx.fill(); }
+    ctx.shadowBlur=0;
+
+    // boss power tokens (pulsing golden diamond)
+    for(const dp of drops){
+      const s=dp.r+3*Math.sin(time*0.15);
+      ctx.save(); ctx.translate(dp.x,dp.y); ctx.rotate(time*0.04);
+      ctx.fillStyle="#ffe08a"; ctx.shadowColor="#ffae00"; ctx.shadowBlur=18;
+      ctx.fillRect(-s/2,-s/2,s,s);
+      ctx.restore();
+    }
     ctx.shadowBlur=0;
 
     // enemies
