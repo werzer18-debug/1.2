@@ -130,7 +130,7 @@
   function reset() {
     player = { x:W/2, y:H/2, r:11, hp:100, maxhp:100, speed:3.4,
                level:1, xp:0, xpNext:18, invuln:0,
-               fireRate:24, fireCd:0, dmg:12, bulletSpeed:8.5, bullets:1, pierce:0, range:1e9,
+               fireRate:15, fireCd:0, dmg:80, bulletSpeed:8.5, bullets:1, pierce:0, range:1e9,
                orbiters:0, orbA:0, orbPos:[], explosive:0,
                nova:0, novaCd:0, lifesteal:0 };
     enemies=[]; bullets=[]; orbs=[]; particles=[]; drops=[]; eBullets=[]; novas=[];
@@ -392,8 +392,8 @@
 
     if(player.invuln>0) player.invuln-=dt*60;
 
-    // auto-fire at nearest
-    player.fireCd-=dt*60;
+    // auto-fire at nearest (fireRate is in frames: 60 = 1s, so tick by dt)
+    player.fireCd-=dt;
     if(player.fireCd<=0&&enemies.length){
       let best=null,bd=1e18;
       for(const e of enemies){const d=dist2(player.x,player.y,e.x,e.y);if(d<bd){bd=d;best=e;}}
