@@ -125,8 +125,8 @@
 
   function reset() {
     player = { x:W/2, y:H/2, r:11, hp:100, maxhp:100, speed:3.4,
-               level:1, xp:0, xpNext:8, invuln:0,
-               fireRate:18, fireCd:0, dmg:20, bulletSpeed:8.5, bullets:1, pierce:0, range:1e9,
+               level:1, xp:0, xpNext:12, invuln:0,
+               fireRate:24, fireCd:0, dmg:20, bulletSpeed:8.5, bullets:1, pierce:0, range:1e9,
                orbiters:0, orbA:0, orbPos:[], explosive:0 };
     enemies=[]; bullets=[]; orbs=[]; particles=[];
     keys={}; time=0; kills=0; spawnTimer=0; paused=false; gameOver=false;
@@ -169,7 +169,7 @@
   function spawnBoss(){
     const x=W/2, y=-60;
     const secs=time/60;                 // scales with real time (trimmed for slower fire rate)
-    const hp=Math.floor(1500+secs*45);
+    const hp=Math.floor(1200+secs*36);
     enemies.push({ x,y, r:42, hp, maxhp:hp, speed:0.78, dmg:34, big:true, boss:true,
                    color:"#b06bff", hit:0 });
     sfx.boss(); bannerText="◆  B O S S  ◆"; bannerT=130; addShake(8);
@@ -193,7 +193,7 @@
     return out;
   }
   function levelUp(){
-    player.level++; player.xp-=player.xpNext; player.xpNext=Math.floor(player.xpNext*1.5+5);
+    player.level++; player.xp-=player.xpNext; player.xpNext=Math.floor(player.xpNext*1.6+8);
     player.hp=Math.min(player.maxhp,player.hp+8);
     paused=true;
     const choices=pick3();
@@ -233,7 +233,7 @@
 
     // spawn ramp (gentler: starts slow, never gets insane)
     spawnTimer-=dt*60;
-    const interval=Math.max(34,90-time*0.35);
+    const interval=Math.max(48,110-time*0.3);
     if(spawnTimer<=0){ spawnEnemy(); spawnTimer=interval; }
 
     // boss: first at 45s, then every 60s (time is in frames; 60 frames = 1s)
