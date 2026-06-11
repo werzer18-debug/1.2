@@ -127,7 +127,7 @@
   // ---- state ----
   let player, enemies, bullets, orbs, particles, drops, eBullets, novas, keys;
   let time, kills, spawnTimer, paused, gameOver, shake, frame, lastTs, acc;
-  let wave, waveStart, wavePhase, nextMini, miniCount, bannerText, bannerT;
+  let wave, waveStart, wavePhase, nextMini, miniCount, bannerText, bannerT, spawnTimerBig;
 
   function reset() {
     player = { x:WORLD_W/2, y:WORLD_H/2, r:11, hp:100, maxhp:100, speed:3.4,
@@ -283,7 +283,15 @@
         else iv=Math.max(6, 24 - (s-20)*0.15);  // 20s+: slowly increases
         return iv/3.2;        // 3.2x faster spawns overall
       },
-      bigChance:     (s)=> s<30 ? 0 : Math.min((s-30)/320, 0.25), // big mobs: gentle intro, capped chance
+      // big mobs get their own staged spawn cadence (like small mobs, but slower).
+      // start after 25s, then ramp the rate up. Infinity = none yet.
+      bigSpawnInterval: (s)=>{
+        if(s<25)  return Infinity;
+        if(s<45)  return 230;   // ~0.26/s
+        if(s<80)  return 160;   // ~0.38/s
+        if(s<120) return 115;   // ~0.52/s
+        return Math.max(80, 115 - (s-120)*0.3);  // up to ~0.75/s
+      },
       bigCap:        6,                                       // max concurrent elite/big mobs
       miniGap:       [100,100],                               // seconds between minibosses (fixed 100)
       bossHp:        ()=> 15000,
@@ -298,7 +306,7 @@
 
   function startWave(){
     const cfg=WAVES[wave]; if(!cfg) return;
-    waveStart=time; wavePhase="fight"; spawnTimer=0;
+    waveStart=time; wavePhase="fight"; spawnTimer=0; spawnTimerBig=0;
     // schedule against real-time `time` (60 units = 1 real second)
     nextMini=time+rand(cfg.miniGap[0],cfg.miniGap[1])*60;
   }
@@ -310,13 +318,16 @@
       // mobs: small at first, big mixed in as the wave progresses
       // (spawnInterval is in frames: 60 = 1s, so tick by dt — NOT dt*60)
       spawnTimer-=dt;
-      if(spawnTimer<=0){
-        let big = Math.random()<cfg.bigChance(elapsed);
-        // cap concurrent big/elite mobs so they can't pile up without limit
-        if(big){ let bc=0; for(const e of enemies) if(e.big&&!e.mini&&!e.boss) bc++;
-          if(bc>=(cfg.bigCap||6)) big=false; }
-        spawnEnemy(big);
-        spawnTimer=cfg.spawnInterval(elapsed);
+      if(spawnTimer<=0){ spawnEnemy(false); spawnTimer=cfg.spawnInterval(elapsed); }
+      // big mobs on their own staged cadence, capped by concurrent count
+      spawnTimerBig-=dt;
+      if(spawnTimerBig<=0){
+        const bi=cfg.bigSpawnInterval(elapsed);
+        if(isFinite(bi)){
+          let bc=0; for(const e of enemies) if(e.big&&!e.mini&&!e.boss) bc++;
+          if(bc<(cfg.bigCap||6)) spawnEnemy(true);
+          spawnTimerBig=bi;
+        } else spawnTimerBig=30;   // recheck soon until big mobs unlock
       }
       // minibosses every random 50-80 REAL seconds, can stack
       if(time>=nextMini){ spawnMiniboss(); nextMini=time+rand(cfg.miniGap[0],cfg.miniGap[1])*60; }
