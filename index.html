@@ -98,7 +98,10 @@
 
   // ---- audio (tiny WebAudio synth — no asset files) ----
   let actx=null;
-  function initAudio(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } }
+  function initAudio(){
+    if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+    if(actx && actx.state==="suspended") actx.resume();
+  }
   function tone(freq,dur,type,vol,slide){
     if(!actx)return; const t=actx.currentTime;
     const o=actx.createOscillator(), g=actx.createGain();
@@ -131,7 +134,7 @@
 
   function reset() {
     player = { x:WORLD_W/2, y:WORLD_H/2, r:11, hp:100, maxhp:100, speed:3.4,
-               level:1, xp:0, xpNext:18, invuln:0,
+               level:1, xp:0, xpNext:10, invuln:0,
                fireRate:15, fireCd:0, dmg:80, bulletSpeed:8.5, bullets:1, pierce:0, range:1e9,
                orbiters:0, orbA:0, orbPos:[], explosive:0,
                nova:0, novaCd:0, lifesteal:0 };
@@ -144,6 +147,8 @@
     overlay.classList.remove("show"); ovBtn.style.display="none";
   }
 
+  addEventListener("click", initAudio);
+  addEventListener("touchstart", initAudio);
   addEventListener("keydown",e=>{ initAudio(); keys[e.key.toLowerCase()]=true;
     if([" ","arrowup","arrowdown","arrowleft","arrowright"].includes(e.key.toLowerCase()))e.preventDefault(); });
   addEventListener("keyup",e=>{ keys[e.key.toLowerCase()]=false; });
@@ -379,7 +384,7 @@
     overlay.classList.add("show");
   }
   function levelUp(){
-    player.level++; player.xp-=player.xpNext; player.xpNext=Math.floor(player.xpNext*1.7+10);
+    player.level++; player.xp-=player.xpNext; player.xpNext=Math.floor(player.xpNext*1.65+8);
     player.hp=Math.min(player.maxhp,player.hp+8);
     showUpgradeChoice("LEVEL "+player.level, "Choose an upgrade");
   }
