@@ -129,7 +129,7 @@
   function reset() {
     player = { x:W/2, y:H/2, r:11, hp:100, maxhp:100, speed:3.4,
                level:1, xp:0, xpNext:18, invuln:0,
-               fireRate:24, fireCd:0, dmg:17, bulletSpeed:8.5, bullets:1, pierce:0, range:1e9,
+               fireRate:24, fireCd:0, dmg:15, bulletSpeed:8.5, bullets:1, pierce:0, range:1e9,
                orbiters:0, orbA:0, orbPos:[], explosive:0 };
     enemies=[]; bullets=[]; orbs=[]; particles=[];
     keys={}; time=0; kills=0; spawnTimer=0; paused=false; gameOver=false;
@@ -152,7 +152,7 @@
       particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rand(14,30),max:30,color,r:rand(1.5,3.5)});
     }
   }
-  function addShake(n){ shake=Math.min(shake+n,16); }
+  function addShake(n){ shake=Math.min(shake+n*0.5,9); }
 
   // ---- spawning ----
   function spawnEnemy(){
