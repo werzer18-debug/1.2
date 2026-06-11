@@ -94,7 +94,7 @@
   const rand=(a,b)=>a+Math.random()*(b-a);
   const dist2=(ax,ay,bx,by)=>{const dx=ax-bx,dy=ay-by;return dx*dx+dy*dy;};
   const fmt=(s)=>{ s=Math.max(0,Math.ceil(s)); const m=Math.floor(s/60); return m>0?(m+":"+String(s%60).padStart(2,"0")):(s+"s"); };
-  const XP_MULT=1.265;                 // base XP gain bonus (+15% then +10%)
+  const XP_MULT=1.581;                 // base XP gain bonus (+15%, +10%, then +25%)
 
   // ---- audio (tiny WebAudio synth — no asset files) ----
   let actx=null;
