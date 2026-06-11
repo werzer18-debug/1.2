@@ -47,6 +47,9 @@
   .card:hover { border-color:#5ad1ff; transform:translateY(-3px); background:#121734; }
   .card .t { color:#9fd6ff; font-size:14px; font-weight:700; margin-bottom:4px; }
   .card .d { color:#8a8aa6; font-size:11px; line-height:1.5; }
+  .card .lv { margin-top:7px; font-size:12px; color:#ffd25a; letter-spacing:1px; }
+  .card .lv .nx { color:#6f6f8a; letter-spacing:0; }
+  .card .lv.new { color:#8effc0; font-weight:700; }
   .btn {
     pointer-events:auto; cursor:pointer; margin-top:6px; padding:8px 18px;
     background:#1a2140; border:1px solid #3a4570;
@@ -132,6 +135,7 @@
     keys={}; time=0; kills=0; spawnTimer=0; paused=false; gameOver=false;
     shake=0; frame=0; lastTs=performance.now();
     nextBoss=45*60; bannerText=""; bannerT=0;
+    UPGRADES.forEach(u=>u.lvl=0);   // reset upgrade stars each run
     overlay.classList.remove("show"); ovBtn.style.display="none";
   }
 
@@ -177,16 +181,22 @@
 
   // ---- leveling ----
   const UPGRADES=[
-    {t:"+1 Projectile", d:"Fire an extra bullet each shot.", fn:p=>p.bullets++},
-    {t:"Rapid Fire", d:"Shoot 25% faster.", fn:p=>p.fireRate=Math.max(5,p.fireRate*0.75)},
-    {t:"Heavy Rounds", d:"+40% bullet damage.", fn:p=>p.dmg*=1.4},
-    {t:"Piercing", d:"Bullets pass through +1 enemy.", fn:p=>p.pierce++},
-    {t:"Swift Boots", d:"+18% move speed.", fn:p=>p.speed*=1.18},
-    {t:"Vitality", d:"+30 max HP and heal 30.", fn:p=>{p.maxhp+=30;p.hp=Math.min(p.maxhp,p.hp+30);}},
-    {t:"Velocity", d:"+30% bullet speed.", fn:p=>p.bulletSpeed*=1.3},
-    {t:"Orbiting Blade", d:"A blade spins around you, shredding what it touches.", fn:p=>p.orbiters++},
-    {t:"Explosive Rounds", d:"Kills detonate, damaging nearby enemies.", fn:p=>p.explosive++},
+    {t:"+1 Projectile", lvl:0, d:"Fire an extra bullet each shot.", fn:p=>p.bullets++},
+    {t:"Rapid Fire", lvl:0, d:"Shoot 25% faster.", fn:p=>p.fireRate=Math.max(5,p.fireRate*0.75)},
+    {t:"Heavy Rounds", lvl:0, d:"+40% bullet damage.", fn:p=>p.dmg*=1.4},
+    {t:"Piercing", lvl:0, d:"Bullets pass through +1 enemy.", fn:p=>p.pierce++},
+    {t:"Swift Boots", lvl:0, d:"+18% move speed.", fn:p=>p.speed*=1.18},
+    {t:"Vitality", lvl:0, d:"+30 max HP and heal 30.", fn:p=>{p.maxhp+=30;p.hp=Math.min(p.maxhp,p.hp+30);}},
+    {t:"Velocity", lvl:0, d:"+30% bullet speed.", fn:p=>p.bulletSpeed*=1.3},
+    {t:"Orbiting Blade", lvl:0, d:"A blade spins around you, shredding what it touches.", fn:p=>p.orbiters++},
+    {t:"Explosive Rounds", lvl:0, d:"Kills detonate, damaging nearby enemies.", fn:p=>p.explosive++},
   ];
+  // stars showing how many times an upgrade has already been taken
+  function lvlTag(u){
+    if(u.lvl<=0) return `<div class="lv new">◇ NEW</div>`;
+    const stars = "★".repeat(Math.min(u.lvl,6)) + (u.lvl>6 ? " ×"+u.lvl : "");
+    return `<div class="lv">${stars} <span class="nx">→ Lv ${u.lvl+1}</span></div>`;
+  }
   function pick3(){
     const pool=[...UPGRADES]; const out=[];
     for(let i=0;i<3;i++) out.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
@@ -202,8 +212,8 @@
     ovCards.innerHTML=""; ovBtn.style.display="none";
     choices.forEach(u=>{
       const el=document.createElement("div"); el.className="card";
-      el.innerHTML=`<div class="t">${u.t}</div><div class="d">${u.d}</div>`;
-      el.onclick=()=>{ u.fn(player); paused=false; overlay.classList.remove("show"); burst(player.x,player.y,"#8effc0",24,5); addShake(6); };
+      el.innerHTML=`<div class="t">${u.t}</div><div class="d">${u.d}</div>${lvlTag(u)}`;
+      el.onclick=()=>{ u.fn(player); u.lvl++; paused=false; overlay.classList.remove("show"); burst(player.x,player.y,"#8effc0",24,5); addShake(6); };
       ovCards.appendChild(el);
     });
     sfx.level();
