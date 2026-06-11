@@ -508,11 +508,13 @@
       } else {
         orbs.push({x:e.x,y:e.y,r:4,v:e.big?5:1});
       }
-      // explosive rounds: detonate, hurting nearby enemies
+      // explosive rounds: detonate, hurting nearby enemies (crowd tool — heavily
+      // reduced vs minibosses/bosses so chained blasts can't burst them down)
       if(player.explosive>0){
         const R=30+player.explosive*10, dmg=13+player.explosive*7;
         burst(e.x,e.y,"#ffb24a",18,6);
-        for(const o of enemies){ if(o!==e && !o.dead && dist2(o.x,o.y,e.x,e.y)<R*R){ o.hp-=dmg; o.hit=6; } }
+        for(const o of enemies){ if(o!==e && !o.dead && dist2(o.x,o.y,e.x,e.y)<R*R){
+          o.hp -= (o.mini||o.boss) ? dmg*0.15 : dmg; o.hit=6; } }
       }
       // life leech: heal a tiny amount on each kill
       if(player.lifesteal>0) player.hp=Math.min(player.maxhp, player.hp+player.lifesteal*0.1);
