@@ -266,7 +266,9 @@
   function makeWave(opts){
     return Object.assign({
       minDuration: 150,                                       // seconds before the boss arrives
-      spawnInterval: (s)=> Math.max(96, 180 - s*0.45),        // frames between spawns (significantly slower)
+      // pulsing spawns: ~13s of calm that slowly ramps up, then a ~5s rapid SURGE, repeat.
+      // (frames between spawns; 60 = 1s) lower = faster.
+      spawnInterval: (s)=>{ const p=18, t=(s%p)/p; return t<0.72 ? 55-(t/0.72)*22 : 8; },
       bigChance:     (s)=> s<30 ? 0 : Math.min((s-30)/320, 0.25), // big mobs: gentle intro, capped chance
       bigCap:        6,                                       // max concurrent elite/big mobs
       miniGap:       [100,100],                               // seconds between minibosses (fixed 100)
