@@ -131,7 +131,7 @@
     enemies=[]; bullets=[]; orbs=[]; particles=[];
     keys={}; time=0; kills=0; spawnTimer=0; paused=false; gameOver=false;
     shake=0; frame=0; lastTs=performance.now();
-    nextBoss=45; bannerText=""; bannerT=0;
+    nextBoss=45*60; bannerText=""; bannerT=0;
     overlay.classList.remove("show"); ovBtn.style.display="none";
   }
 
@@ -168,8 +168,9 @@
 
   function spawnBoss(){
     const x=W/2, y=-60;
-    const hp=420+time*7;
-    enemies.push({ x,y, r:42, hp, maxhp:hp, speed:0.75, dmg:34, big:true, boss:true,
+    const secs=time/60;                 // beefier boss, scales with real time
+    const hp=Math.floor(1800+secs*55);
+    enemies.push({ x,y, r:42, hp, maxhp:hp, speed:0.78, dmg:34, big:true, boss:true,
                    color:"#b06bff", hit:0 });
     sfx.boss(); bannerText="◆  B O S S  ◆"; bannerT=130; addShake(8);
   }
@@ -212,7 +213,7 @@
   function die(){
     gameOver=true; paused=true;
     ovTitle.textContent="YOU DIED"; ovTitle.style.color="#ff6b7a";
-    ovSub.textContent=`Survived ${Math.floor(time)}s · Level ${player.level} · ${kills} kills`;
+    ovSub.textContent=`Survived ${Math.floor(time/60)}s · Level ${player.level} · ${kills} kills`;
     ovCards.innerHTML=""; ovBtn.style.display="inline-block"; ovBtn.textContent="RUN AGAIN";
     ovBtn.onclick=()=>{ reset(); };
     overlay.classList.add("show");
@@ -235,8 +236,8 @@
     const interval=Math.max(20,72-time*0.4);
     if(spawnTimer<=0){ spawnEnemy(); spawnTimer=interval; }
 
-    // boss every 60s (first at 45s)
-    if(time>=nextBoss){ spawnBoss(); nextBoss+=60; }
+    // boss: first at 45s, then every 60s (time is in frames; 60 frames = 1s)
+    if(time>=nextBoss){ spawnBoss(); nextBoss+=60*60; }
     if(bannerT>0) bannerT-=dt*60;
 
     if(player.invuln>0) player.invuln-=dt*60;
@@ -381,8 +382,9 @@
         ctx.arc(e.x,e.y,e.r+4,-Math.PI/2,-Math.PI/2+Math.PI*2*(e.hp/e.maxhp)); ctx.stroke(); }
     }
 
-    // bullets
-    ctx.fillStyle="#fff3b0"; ctx.shadowColor="#ffd25a"; ctx.shadowBlur=8;
+    // bullets (turn orange when explosive rounds are active)
+    ctx.fillStyle=player.explosive>0?"#ffb24a":"#fff3b0";
+    ctx.shadowColor=player.explosive>0?"#ff7b3a":"#ffd25a"; ctx.shadowBlur=8;
     for(const b of bullets){ ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,7);ctx.fill(); }
     ctx.shadowBlur=0;
 
@@ -391,10 +393,12 @@
       ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill(); }
     ctx.globalAlpha=1;
 
-    // orbiting blades
+    // orbiting blades (bright cyan, with a spoke so they read clearly)
     if(!gameOver) for(const p of player.orbPos){
-      ctx.fillStyle="#cfa8ff"; ctx.shadowColor="#b06bff"; ctx.shadowBlur=10;
-      ctx.beginPath();ctx.arc(p.x,p.y,7,0,7);ctx.fill();
+      ctx.strokeStyle="rgba(120,240,255,.35)"; ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(player.x,player.y);ctx.lineTo(p.x,p.y);ctx.stroke();
+      ctx.fillStyle="#e6fbff"; ctx.shadowColor="#39e0ff"; ctx.shadowBlur=14;
+      ctx.beginPath();ctx.arc(p.x,p.y,9,0,7);ctx.fill();
       ctx.shadowBlur=0;
     }
 
@@ -424,11 +428,23 @@
       ctx.fillText(bannerText, W/2, H*0.32);
       ctx.globalAlpha=1;
     }
+
+    // loadout readout — picked abilities visibly show here
+    const load=[];
+    if(player.bullets>1)   load.push("✦ shots x"+player.bullets);
+    if(player.pierce>0)    load.push("→ pierce "+player.pierce);
+    if(player.orbiters>0)  load.push("◉ blade x"+player.orbiters);
+    if(player.explosive>0) load.push("✸ boom x"+player.explosive);
+    if(load.length){
+      ctx.font="11px monospace"; ctx.textAlign="left";
+      ctx.fillStyle="#7fe9ff";
+      load.forEach((s,i)=>ctx.fillText(s, 12, H-12-i*15));
+    }
   }
 
   function syncHud(){
     hud.lvl.textContent=player.level;
-    hud.time.textContent=Math.floor(time);
+    hud.time.textContent=Math.floor(time/60);
     hud.hp.textContent=Math.ceil(player.hp);
     hud.kills.textContent=kills;
     hud.fill.style.width=(100*player.xp/player.xpNext)+"%";
