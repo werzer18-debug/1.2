@@ -203,7 +203,7 @@
   function spawnMiniboss(){
     const p=edgePos(30);
     miniCount++;
-    const hp=Math.floor(progressive(22000, 1.2, miniCount-1));   // reusable scaling
+    const hp=Math.floor(progressive(12000, 1.2, miniCount-1));   // reusable scaling
     const dmg=Math.floor(progressive(14, 1.15, miniCount-1));
     enemies.push({ x:p.x, y:p.y, r:38, hp, maxhp:hp, speed:0.95, dmg,
                    big:true, mini:true, color:"#ff5ec4", hit:0,
@@ -269,14 +269,14 @@
       spawnInterval: (s)=> Math.max(60, 130 - s*0.4),         // frames between mob spawns (slow)
       bigChance:     (s)=> s<25 ? 0 : Math.min((s-25)/250, 0.35), // big mobs introduced gradually
       miniGap:       [100,100],                               // seconds between minibosses (fixed 100)
-      bossHp:        ()=> 48000,
+      bossHp:        ()=> 22000,
     }, opts);
   }
   const WAVES = {
     1: makeWave({}),                                          // Wave 1 — fully defined
     // Placeholders — fill in real content later WITHOUT touching Wave 1:
-    2: makeWave({ bossHp:()=>60000 }),
-    3: makeWave({ bossHp:()=>75000 }),
+    2: makeWave({ bossHp:()=>28000 }),
+    3: makeWave({ bossHp:()=>36000 }),
   };
 
   function startWave(){
@@ -291,7 +291,8 @@
     const elapsed=(time-waveStart)/60;
     if(wavePhase==="fight"){
       // mobs: small at first, big mixed in as the wave progresses
-      spawnTimer-=dt*60;
+      // (spawnInterval is in frames: 60 = 1s, so tick by dt — NOT dt*60)
+      spawnTimer-=dt;
       if(spawnTimer<=0){
         spawnEnemy(Math.random()<cfg.bigChance(elapsed));
         spawnTimer=cfg.spawnInterval(elapsed);
