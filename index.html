@@ -124,7 +124,7 @@
   // ---- state ----
   let player, enemies, bullets, orbs, particles, drops, keys;
   let time, kills, spawnTimer, paused, gameOver, shake, frame, lastTs;
-  let wave, waveStart, wavePhase, miniTimer, bannerText, bannerT;
+  let wave, waveStart, wavePhase, nextMini, bannerText, bannerT;
 
   function reset() {
     player = { x:W/2, y:H/2, r:11, hp:100, maxhp:100, speed:3.4,
@@ -225,7 +225,8 @@
   function startWave(){
     const cfg=WAVES[wave]; if(!cfg) return;
     waveStart=time; wavePhase="fight"; spawnTimer=0;
-    miniTimer=rand(cfg.miniGap[0],cfg.miniGap[1])*60;
+    // schedule against real-time `time` (60 units = 1 real second)
+    nextMini=time+rand(cfg.miniGap[0],cfg.miniGap[1])*60;
   }
 
   function updateWave(dt){
@@ -238,9 +239,8 @@
         spawnEnemy(Math.random()<cfg.bigChance(elapsed));
         spawnTimer=cfg.spawnInterval(elapsed);
       }
-      // minibosses every 50-80s, can stack
-      miniTimer-=dt*60;
-      if(miniTimer<=0){ spawnMiniboss(); miniTimer=rand(cfg.miniGap[0],cfg.miniGap[1])*60; }
+      // minibosses every random 50-80 REAL seconds, can stack
+      if(time>=nextMini){ spawnMiniboss(); nextMini=time+rand(cfg.miniGap[0],cfg.miniGap[1])*60; }
       // boss after the minimum wave duration
       if(elapsed>=cfg.minDuration){ spawnBoss(); wavePhase="boss"; }
     } else if(wavePhase==="boss"){
