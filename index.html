@@ -281,16 +281,22 @@
         else if(s<15) iv=35;
         else if(s<20) iv=28;
         else iv=Math.max(6, 24 - (s-20)*0.15);  // 20s+: slowly increases
-        return iv/3.2;        // 3.2x faster spawns overall
+        iv/=3.2;              // 3.2x faster spawns overall
+        // once big mobs appear (25s+), gradually thin the small mobs (up to ~35% slower),
+        // but never stop them — keeps the difficulty curve smooth.
+        if(s>25) iv*=1+Math.min((s-25)/60, 0.35);
+        return iv;
       },
       // big mobs get their own staged spawn cadence (like small mobs, but slower).
       // start after 25s, then ramp the rate up. Infinity = none yet.
       bigSpawnInterval: (s)=>{
-        if(s<25)  return Infinity;
-        if(s<45)  return 230;   // ~0.26/s
-        if(s<80)  return 160;   // ~0.38/s
-        if(s<120) return 115;   // ~0.52/s
-        return Math.max(80, 115 - (s-120)*0.3);  // up to ~0.75/s
+        if(s<25) return Infinity;
+        let iv;
+        if(s<45)  iv=230;
+        else if(s<80)  iv=160;
+        else if(s<120) iv=115;
+        else iv=Math.max(80, 115 - (s-120)*0.3);
+        return iv/3;          // 3x faster big-mob spawns
       },
       bigCap:        6,                                       // max concurrent elite/big mobs
       miniGap:       [100,100],                               // seconds between minibosses (fixed 100)
