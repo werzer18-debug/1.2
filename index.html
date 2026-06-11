@@ -124,7 +124,7 @@
   // ---- state ----
   let player, enemies, bullets, orbs, particles, drops, keys;
   let time, kills, spawnTimer, paused, gameOver, shake, frame, lastTs;
-  let nextBoss, bannerText, bannerT;
+  let wave, waveStart, wavePhase, miniTimer, bannerText, bannerT;
 
   function reset() {
     player = { x:W/2, y:H/2, r:11, hp:100, maxhp:100, speed:3.4,
@@ -134,7 +134,8 @@
     enemies=[]; bullets=[]; orbs=[]; particles=[]; drops=[];
     keys={}; time=0; kills=0; spawnTimer=0; paused=false; gameOver=false;
     shake=0; frame=0; lastTs=performance.now();
-    nextBoss=200*60; bannerText=""; bannerT=0;
+    bannerText=""; bannerT=0;
+    wave=1; startWave();            // kick off Wave 1
     UPGRADES.forEach(u=>u.lvl=0);   // reset upgrade stars each run
     overlay.classList.remove("show"); ovBtn.style.display="none";
   }
@@ -155,32 +156,102 @@
   function addShake(n){ shake=Math.min(shake+n*0.5,9); }
 
   // ---- spawning ----
-  function spawnEnemy(){
-    const edge=Math.floor(rand(0,4));
-    let x,y;
-    if(edge===0){x=rand(0,W);y=-20;} else if(edge===1){x=W+20;y=rand(0,H);}
-    else if(edge===2){x=rand(0,W);y=H+20;} else {x=-20;y=rand(0,H);}
+  function edgePos(pad){            // a random point just off one screen edge
+    const e=Math.floor(rand(0,4));
+    if(e===0) return {x:rand(0,W), y:-pad};
+    if(e===1) return {x:W+pad,     y:rand(0,H)};
+    if(e===2) return {x:rand(0,W), y:H+pad};
+    return {x:-pad, y:rand(0,H)};
+  }
+
+  // a normal mob (small, or big when big=true). HP x1.5 vs old baseline.
+  function spawnEnemy(big){
+    const p=edgePos(20);
     const secs=time/60;
     const hpScale=secs*0.35;            // mobs slowly gain HP over time
     const dmgScale=secs*0.03;           // and very slowly gain damage
-    const big=Math.random()<Math.min(0.08+secs/300,0.25);
+    const hp=((big?81:20)+hpScale*(big?3:1))*1.5;
     enemies.push({
-      x,y, r: big?20:11,
-      hp: (big?81:20) + hpScale*(big?3:1), maxhp:0,
+      x:p.x, y:p.y, r: big?20:11,
+      hp, maxhp:hp,
       speed: big?0.8:rand(0.9,1.4),
-      dmg: (big?20:10) + dmgScale*(big?1.5:1), big,
+      dmg: (big?20:10)+dmgScale*(big?1.5:1), big,
       color: big?"#ff7b3a":"#ff5d6a", hit:0
     });
-    enemies[enemies.length-1].maxhp=enemies[enemies.length-1].hp;
   }
 
+  // boss HP for the current wave at the current moment
+  function currentBossHp(){
+    const cfg=WAVES[wave], elapsed=(time-waveStart)/60;
+    return cfg ? cfg.bossHp(elapsed) : Math.floor((1200+(time/60)*36)*5);
+  }
+
+  // miniboss: 50% of current boss HP, several can coexist
+  function spawnMiniboss(){
+    const p=edgePos(30);
+    const hp=Math.floor(currentBossHp()*0.5);
+    enemies.push({ x:p.x, y:p.y, r:28, hp, maxhp:hp, speed:0.95, dmg:26,
+                   big:true, mini:true, color:"#ff5ec4", hit:0 });
+    sfx.boss(); bannerText="MINIBOSS"; bannerT=70; addShake(5);
+  }
+
+  // wave boss: clears all NORMAL mobs (keeps minibosses) then arrives
   function spawnBoss(){
-    const x=W/2, y=-60;
-    const secs=time/60;                 // 5x boss HP
-    const hp=Math.floor((1200+secs*36)*5);
-    enemies.push({ x,y, r:42, hp, maxhp:hp, speed:0.78, dmg:34, big:true, boss:true,
-                   color:"#b06bff", hit:0 });
-    sfx.boss(); bannerText="◆  B O S S  ◆"; bannerT=130; addShake(8);
+    enemies=enemies.filter(e=>e.mini||e.boss);   // keep minibosses, drop normals
+    const hp=currentBossHp();
+    enemies.push({ x:W/2, y:-60, r:42, hp, maxhp:hp, speed:0.78, dmg:34,
+                   big:true, boss:true, color:"#b06bff", hit:0 });
+    sfx.boss(); bannerText="◆  B O S S  ◆"; bannerT=140; addShake(8);
+  }
+
+  // ---- wave system (modular: each wave is a self-contained config) ----
+  const TOTAL_WAVES=3;
+  function makeWave(opts){
+    return Object.assign({
+      minDuration: 120,                                       // seconds before the boss can arrive
+      spawnInterval: (s)=> Math.max(60, 130 - s*0.4),         // frames between mob spawns (slow)
+      bigChance:     (s)=> s<25 ? 0 : Math.min((s-25)/250, 0.35), // big mobs introduced gradually
+      miniGap:       [50,80],                                 // seconds between minibosses (random)
+      bossHp:        (s)=> Math.floor((1200 + s*36) * 5),
+    }, opts);
+  }
+  const WAVES = {
+    1: makeWave({}),                                          // Wave 1 — fully defined
+    // Placeholders — fill in real content later WITHOUT touching Wave 1:
+    2: makeWave({ minDuration:130, bossHp:(s)=>Math.floor((1600+s*40)*5) }),
+    3: makeWave({ minDuration:140, bossHp:(s)=>Math.floor((2000+s*46)*5) }),
+  };
+
+  function startWave(){
+    const cfg=WAVES[wave]; if(!cfg) return;
+    waveStart=time; wavePhase="fight"; spawnTimer=0;
+    miniTimer=rand(cfg.miniGap[0],cfg.miniGap[1])*60;
+  }
+
+  function updateWave(dt){
+    const cfg=WAVES[wave]; if(!cfg) return;        // all waves cleared -> idle
+    const elapsed=(time-waveStart)/60;
+    if(wavePhase==="fight"){
+      // mobs: small at first, big mixed in as the wave progresses
+      spawnTimer-=dt*60;
+      if(spawnTimer<=0){
+        spawnEnemy(Math.random()<cfg.bigChance(elapsed));
+        spawnTimer=cfg.spawnInterval(elapsed);
+      }
+      // minibosses every 50-80s, can stack
+      miniTimer-=dt*60;
+      if(miniTimer<=0){ spawnMiniboss(); miniTimer=rand(cfg.miniGap[0],cfg.miniGap[1])*60; }
+      // boss after the minimum wave duration
+      if(elapsed>=cfg.minDuration){ spawnBoss(); wavePhase="boss"; }
+    } else if(wavePhase==="boss"){
+      // no new spawns; wave clears when the boss is defeated
+      if(!enemies.some(e=>e.boss)){
+        wavePhase="done";
+        wave++;
+        if(WAVES[wave]){ bannerText="WAVE "+(wave-1)+" CLEARED"; bannerT=150; startWave(); }
+        else { bannerText="ALL WAVES CLEARED!"; bannerT=300; }
+      }
+    }
   }
 
   // ---- leveling ----
@@ -248,13 +319,8 @@
     player.x=Math.max(player.r,Math.min(W-player.r,player.x+mx*player.speed));
     player.y=Math.max(player.r,Math.min(H-player.r,player.y+my*player.speed));
 
-    // spawn ramp (gentler: starts slow, never gets insane)
-    spawnTimer-=dt*60;
-    const interval=Math.max(96,220-time*0.6);
-    if(spawnTimer<=0){ spawnEnemy(); spawnTimer=interval; }
-
-    // boss every 200s (time is in frames; 60 frames = 1s)
-    if(time>=nextBoss){ spawnBoss(); nextBoss+=200*60; }
+    // wave system drives all spawning (mobs, minibosses, boss)
+    updateWave(dt);
     if(bannerT>0) bannerT-=dt*60;
 
     if(player.invuln>0) player.invuln-=dt*60;
@@ -343,6 +409,10 @@
         player.hp=Math.min(player.maxhp,player.hp+30);
         drops.push({x:e.x,y:e.y,r:13});   // power token — grab it to choose an ability
         bannerText="BOSS DOWN"; bannerT=100; sfx.bossdown();
+      } else if(e.mini){
+        for(let i=0;i<8;i++) orbs.push({x:e.x+rand(-24,24),y:e.y+rand(-24,24),r:4,v:3});
+        player.hp=Math.min(player.maxhp,player.hp+12);
+        bannerText="MINIBOSS DOWN"; bannerT=80; sfx.bossdown();
       } else {
         orbs.push({x:e.x,y:e.y,r:4,v:e.big?5:1});
       }
@@ -448,6 +518,29 @@
     ctx.restore();
 
     // --- screen-space UI (no shake) ---
+    // wave progress bar (top-center): completed / current / remaining
+    {
+      const n=TOTAL_WAVES, segW=58, gap=8, totalW=n*segW+(n-1)*gap;
+      const x0=(W-totalW)/2, y0=12, bh=6;
+      for(let i=0;i<n;i++){
+        const wn=i+1, x=x0+i*(segW+gap);
+        if(wn<wave){                                   // completed
+          ctx.fillStyle="#8effc0"; ctx.fillRect(x,y0,segW,bh);
+        } else if(wn===wave){                          // current (highlighted, fills with progress)
+          ctx.fillStyle="#10131f"; ctx.fillRect(x,y0,segW,bh);
+          const cfg=WAVES[wave];
+          const prog = wavePhase==="boss" ? 1 : (cfg?Math.min(((time-waveStart)/60)/cfg.minDuration,1):1);
+          ctx.fillStyle="#5ad1ff"; ctx.fillRect(x,y0,segW*prog,bh);
+          ctx.strokeStyle="#9fe6ff"; ctx.lineWidth=1; ctx.strokeRect(x+.5,y0+.5,segW-1,bh-1);
+        } else {                                       // remaining (dim)
+          ctx.fillStyle="#23233a"; ctx.fillRect(x,y0,segW,bh);
+        }
+      }
+      ctx.fillStyle="#9fb3d0"; ctx.font="9px monospace"; ctx.textAlign="center";
+      const label = wave>n ? "ALL CLEAR" : ("WAVE "+wave+"/"+n+(wavePhase==="boss"?" · BOSS":""));
+      ctx.fillText(label, W/2, y0+bh+11);
+    }
+
     // boss health bar
     const boss=enemies.find(e=>e.boss);
     if(boss){
