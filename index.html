@@ -203,8 +203,8 @@
   function spawnMiniboss(){
     const p=edgePos(30);
     miniCount++;
-    const hp=Math.floor(progressive(1600, 1.35, miniCount-1));   // reusable scaling
-    const dmg=Math.floor(progressive(24, 1.18, miniCount-1));
+    const hp=Math.floor(progressive(22000, 1.2, miniCount-1));   // reusable scaling
+    const dmg=Math.floor(progressive(14, 1.15, miniCount-1));
     enemies.push({ x:p.x, y:p.y, r:38, hp, maxhp:hp, speed:0.95, dmg,
                    big:true, mini:true, color:"#ff5ec4", hit:0,
                    abCd:5, tele:0, teleMax:0, teleKind:null, charge:null });
@@ -265,18 +265,18 @@
   const TOTAL_WAVES=3;
   function makeWave(opts){
     return Object.assign({
-      minDuration: 250,                                       // seconds before the boss arrives
+      minDuration: 150,                                       // seconds before the boss arrives
       spawnInterval: (s)=> Math.max(60, 130 - s*0.4),         // frames between mob spawns (slow)
       bigChance:     (s)=> s<25 ? 0 : Math.min((s-25)/250, 0.35), // big mobs introduced gradually
-      miniGap:       [60,60],                                 // seconds between minibosses (fixed 60)
-      bossHp:        (s)=> Math.floor((1200 + s*36) * 5),
+      miniGap:       [100,100],                               // seconds between minibosses (fixed 100)
+      bossHp:        ()=> 48000,
     }, opts);
   }
   const WAVES = {
     1: makeWave({}),                                          // Wave 1 — fully defined
     // Placeholders — fill in real content later WITHOUT touching Wave 1:
-    2: makeWave({ bossHp:(s)=>Math.floor((1600+s*40)*5) }),
-    3: makeWave({ bossHp:(s)=>Math.floor((2000+s*46)*5) }),
+    2: makeWave({ bossHp:()=>60000 }),
+    3: makeWave({ bossHp:()=>75000 }),
   };
 
   function startWave(){
