@@ -124,7 +124,7 @@
 
   // ---- state ----
   let player, enemies, bullets, orbs, particles, drops, eBullets, novas, keys;
-  let time, kills, spawnTimer, paused, gameOver, shake, frame, lastTs;
+  let time, kills, spawnTimer, paused, gameOver, shake, frame, lastTs, acc;
   let wave, waveStart, wavePhase, nextMini, miniCount, bannerText, bannerT;
 
   function reset() {
@@ -135,7 +135,7 @@
                nova:0, novaCd:0, lifesteal:0 };
     enemies=[]; bullets=[]; orbs=[]; particles=[]; drops=[]; eBullets=[]; novas=[];
     keys={}; time=0; kills=0; spawnTimer=0; paused=false; gameOver=false;
-    shake=0; frame=0; lastTs=performance.now();
+    shake=0; frame=0; lastTs=performance.now(); acc=0;
     bannerText=""; bannerT=0; miniCount=0;
     wave=1; startWave();            // kick off Wave 1
     UPGRADES.forEach(u=>u.lvl=0);   // reset upgrade stars each run
@@ -715,9 +715,17 @@
     hud.fill.style.width=(100*player.xp/player.xpNext)+"%";
   }
 
+  // Fixed-timestep loop: the simulation always advances exactly 60 logical
+  // steps per real second, independent of the display's refresh rate or any
+  // frame hitches — so the game pace is constant everywhere.
+  const STEP=1000/60;                  // ms per logical step (60 Hz)
   function loop(ts){
-    const dt=Math.min((ts-lastTs)/16.67,2.5); lastTs=ts;
-    update(dt); render(); syncHud();
+    let elapsed=ts-lastTs; lastTs=ts;
+    if(elapsed>250) elapsed=250;       // clamp big gaps (tab switch) to avoid a catch-up burst
+    acc+=elapsed;
+    let steps=0;
+    while(acc>=STEP && steps<5){ update(1); acc-=STEP; steps++; }  // dt=1 per fixed step
+    render(); syncHud();
     requestAnimationFrame(loop);
   }
 
